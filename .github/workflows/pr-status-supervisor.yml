@@ -1,0 +1,73 @@
+name: Check CI Statuses for Renovate PRs
+
+on:
+  status:
+
+jobs:
+  check-renovate-statuses:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Найти связанный Pull Request
+        id: find_pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
+            });
+
+            if (prs.data.length === 0) {
+              core.setFailed("❌ Не найден PR, связанный с этим коммитом.");
+              return;
+            }
+
+            const pr = prs[0];
+            core.setOutput("pr_number", pr.number);
+            core.setOutput("labels", pr.labels.map(label => label.name).join(','));
+
+      - name: Проверка, есть ли лейбл "renovate"
+        run: |
+          echo "Найденные лейблы: ${{ steps.find_pr.outputs.labels }}"
+          if [[ "${{ steps.find_pr.outputs.labels }}" != *"renovate"* ]]; then
+            echo "⚠️ Лейбл 'renovate' не найден. Прерывание."
+            exit 0
+          fi
+
+      - name: Проверка заданных статусов из secrets
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const expected = [process.env.STATUS_NAME_1, process.env.STATUS_NAME_2];
+
+            const { data: status } = await github.rest.repos.getCombinedStatusForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha
+            });
+
+            const found = {};
+            for (const s of status.statuses) {
+              found[s.context] = s.state;
+            }
+
+            let failed = false;
+            for (const name of expected) {
+              const state = found[name];
+              console.log(`🔍 Статус "${name}": ${state}`);
+              if (state !== "success") {
+                failed = true;
+              }
+            }
+
+            if (failed) {
+              core.setFailed("❌ Один или оба требуемых статуса не успешны.");
+            } else {
+              console.log("✅ Все статусы успешны.");
+            }
+
+      - name: Успешно — запускаем дальнейшие действия
+        if: ${{ success() }}
+        run: echo "🎉 Все CI прошли и PR от Renovate — можно продолжать."
