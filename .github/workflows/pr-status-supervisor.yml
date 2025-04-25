@@ -1,16 +1,13 @@
 name: Listen dummy-ci status
 
 on:
-  status                           # реагируем на любые commit-statuses
+  check_run:
 
 jobs:
   react:
-    # Фильтруем ТОЛЬКО наш контекст, чтобы не спамить на чужие статусы
-    if: ${{ github.event.context == 'dummy-ci' }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Report result
         run: |
-          echo "dummy-ci finished with state: ${{ github.event.state }}"
           echo "${{ toJSON(github.event)}}"
