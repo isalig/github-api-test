@@ -1,11 +1,11 @@
 name: Listen dummy-ci status
 
 on:
-  workflow_run:
-    workflows: ["Dummy CI"]
-    types:
-      - completed
   status:
+  # workflow_run:
+    # workflows: ["Dummy CI"]
+    # types:
+      # - completed
 
 jobs:
   react:
@@ -14,4 +14,4 @@ jobs:
     steps:
       - name: Report result
         run: |
-          echo "${{ toJSON(github.event)}}"
+          echo "${{ github.event_name}}"
