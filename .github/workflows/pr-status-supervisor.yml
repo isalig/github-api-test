@@ -5,6 +5,7 @@ on:
     workflows: ["Dummy CI"]
     types:
       - completed
+  status:
 
 jobs:
   react:
