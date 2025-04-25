@@ -30,17 +30,23 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const {owner, repo} = context.repo;
+            const { owner, repo } = context.repo;
 
             // 1. SHA, по которому пришло событие
             const sha = context.eventName === 'status'
               ? context.sha
               : context.payload.workflow_run.head_sha;
 
-            // 2. Ищем PR, содержащий этот SHA
-            const { data: prs } = await github.rest.pulls.list({
-              owner, repo, head: `${owner}:${sha.substr(0, 7)}`
-            });
+            // 2. Ищем PR, содержащий этот SHA (commits → pulls endpoint)
+            const { data: prs } = await github.request(
+              'GET /repos/{owner}/{repo}/commits/{sha}/pulls',
+              {
+                owner,
+                repo,
+                sha,
+                mediaType: { previews: ['groot'] }   // required preview header
+              }
+            );
 
             if (!prs.length) {
               core.setFailed(`PR for ${sha} not found`);
