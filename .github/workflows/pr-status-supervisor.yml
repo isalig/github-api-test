@@ -37,24 +37,35 @@ jobs:
               ? context.sha
               : context.payload.workflow_run.head_sha;
 
-            // 2. Ищем PR, содержащий этот SHA (commits → pulls endpoint)
-            const { data: prs } = await github.request(
-              'GET /repos/{owner}/{repo}/commits/{sha}/pulls',
-              {
-                owner,
-                repo,
-                sha,
-                mediaType: { previews: ['groot'] }   // required preview header
-              }
-            );
+            let prNumber = null;
 
-            if (!prs.length) {
+            if (context.eventName === 'workflow_run') {
+              // pull_requests[] гарантирован в payload
+              const prsArr = context.payload.workflow_run.pull_requests || [];
+              if (prsArr.length) prNumber = prsArr[0].number;
+            }
+
+            if (!prNumber) {
+              // 2. Для события 'status' (или если массив пуст) – ищем PR по SHA
+              const { data: prs } = await github.request(
+                'GET /repos/{owner}/{repo}/commits/{sha}/pulls',
+                {
+                  owner,
+                  repo,
+                  sha,
+                  mediaType: { previews: ['groot'] }   // required preview
+                }
+              );
+              if (prs.length) prNumber = prs[0].number;
+            }
+
+            if (!prNumber) {
               core.setFailed(`PR for ${sha} not found`);
               return;
             }
 
             core.setOutput('sha', sha);
-            core.setOutput('pr', prs[0].number);
+            core.setOutput('pr', prNumber);
 
       # ------- собираем commit-statuses -------
       - name: Проверяем commit-статусы TeamCity
