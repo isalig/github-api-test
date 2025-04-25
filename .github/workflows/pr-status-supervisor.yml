@@ -1,12 +1,11 @@
 name: Debug check_run
 
 on:
-  check_run:
-    types: [completed]
+  status
 
 jobs:
-  dump:
+  monitor:
     runs-on: ubuntu-latest
     steps:
-      - name: Dump github context
-        run: echo '${{ toJSON(github.event) }}'
+      - name: Dump status
+        run: echo "${{ toJSON(github.event) }}"
