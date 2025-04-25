@@ -1,15 +1,12 @@
-name: Supervisor for CI
+name: Debug check_run
 
 on:
   check_run:
     types: [completed]
 
 jobs:
-  only-for-ci:
-    if: ${{ github.event.check_run.name == 'check-updater' && github.event.check_run.pull_requests[0] }}
+  dump:
     runs-on: ubuntu-latest
     steps:
-      - name: Reacting to check_run from PR
-        run: |
-          echo "CI завершён в PR #${{ github.event.check_run.pull_requests[0].number }}"
-          echo "Результат: ${{ github.event.check_run.conclusion }}"
+      - name: Dump github context
+        run: echo '${{ toJSON(github.event) }}'
