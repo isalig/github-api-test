@@ -22,6 +22,6 @@ jobs:
               sha:   context.sha,
               state: "success",
               context: "dummy-ci",
-              description: "Dummy CI passed 🎉",
+              description: "Dummy CI passed",
               target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             })
