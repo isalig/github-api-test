@@ -34,7 +34,7 @@ jobs:
 
             // 1. SHA, по которому пришло событие
             const sha = context.eventName === 'status'
-              ? context.sha
+              ? event.commit.sha
               : context.payload.workflow_run.head_sha;
 
             let prNumber = null;
