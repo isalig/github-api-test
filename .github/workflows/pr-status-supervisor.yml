@@ -1,7 +1,10 @@
 name: Listen dummy-ci status
 
 on:
-  check_run:
+  workflow_run:
+    workflows: ["Dummy CI"]
+    types:
+      - completed
 
 jobs:
   react:
