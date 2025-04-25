@@ -6,7 +6,7 @@ on:
 
 jobs:
   only-for-ci:
-    if: ${{ github.event.check_run.name == 'CI' && github.event.check_run.pull_requests[0] }}
+    if: ${{ github.event.check_run.name == 'check-updater' && github.event.check_run.pull_requests[0] }}
     runs-on: ubuntu-latest
     steps:
       - name: Reacting to check_run from PR
