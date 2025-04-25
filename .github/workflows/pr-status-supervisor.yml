@@ -1,17 +1,97 @@
-name: Listen dummy-ci status
+name: CI Supervisor (TC + GHA)
 
 on:
   status:
-  # workflow_run:
-    # workflows: ["Dummy CI"]
-    # types:
-      # - completed
+  workflow_run:
+    workflows: ["Dummy CI"]
+    types: [completed]
+
+permissions:
+  contents: read          # для checkout
+  pull-requests: read     # чтобы читать PR-метаданные
+  statuses: read          # смотреть статусы
+  checks: read            # смотреть check-runs
 
 jobs:
-  react:
+  supervise:
+    if: |
+      (github.event_name == 'status') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion != '')
     runs-on: ubuntu-latest
 
+    env:
+      REQ_STATUS: "Custom status: passed"
+      REQ_CHECKS: "build"
+
     steps:
-      - name: Report result
+      - name: Определяем SHA и PR-номер
+        id: sha_pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+
+            // 1. SHA, по которому пришло событие
+            const sha = context.eventName === 'status'
+              ? context.sha
+              : context.payload.workflow_run.head_sha;
+
+            // 2. Ищем PR, содержащий этот SHA
+            const { data: prs } = await github.rest.pulls.list({
+              owner, repo, head: `${owner}:${sha.substr(0, 7)}`
+            });
+
+            if (!prs.length) {
+              core.setFailed(`PR for ${sha} not found`);
+              return;
+            }
+
+            core.setOutput('sha', sha);
+            core.setOutput('pr', prs[0].number);
+
+      # ------- собираем commit-statuses -------
+      - name: Проверяем commit-статусы TeamCity
+        id: st
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const sha = core.getInput('sha', {required:true});
+            const required = process.env.REQ_STATUS.split(',');
+            const { data } = await github.rest.repos.getCombinedStatusForRef({owner, repo, ref: sha});
+            const ok = required.every(ctx =>
+              data.statuses.find(s => s.context === ctx && s.state === 'success')
+            );
+            core.setOutput('status_ok', ok);
+
+      # ------- собираем check-runs GitHub Actions -------
+      - name: Проверяем check-runs GitHub Actions
+        id: cr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const sha = core.getInput('sha', {required:true});
+            const required = process.env.REQ_CHECKS.split(',');
+            const { data } = await github.rest.checks.listForRef({owner, repo, ref: sha});
+            const ok = required.every(name =>
+              data.check_runs.find(r => r.name === name && r.conclusion === 'success')
+            );
+            core.setOutput('checks_ok', ok);
+
+      # ------- финальное условие -------
+      - name: Показываем сводку
         run: |
-          echo "${{ github.event_name}}"
+          echo "Statuses OK : ${{ steps.st.outputs.status_ok }}"
+          echo "Checks   OK : ${{ steps.cr.outputs.checks_ok }}"
+
+      # ------- если ВСЁ зелёное, продолжаем -------
+      - name: Checkout и запускаем SDK-скрипт
+        if: ${{ steps.st.outputs.status_ok == 'true' && steps.cr.outputs.checks_ok == 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Run SDK task
+        if: ${{ steps.st.outputs.status_ok == 'true' && steps.cr.outputs.checks_ok == 'true' }}
+        run: |
+          echo "Running SDK task..."
